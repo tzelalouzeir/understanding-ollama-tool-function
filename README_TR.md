@@ -1,4 +1,53 @@
-# Ollama'nın Araç Fonksiyonları Uygulamasını Anlamak
+# Ollama Araç Fonksiyonları Uygulama Kılavuzu
+
+Bu kılavuz, Ollama'nın LLM modelleriyle araç fonksiyonlarının nasıl uygulanacağını ve kullanılacağını açıklar.
+
+## Ön Koşullar
+
+1. Ollama kurulu ve çalışır durumda
+2. Python 3.7+
+3. Gerekli Python paketleri:
+```bash
+pip install ollama requests pandas yfinance nltk
+```
+
+## Yapılandırma
+
+Örnekleri kullanmadan önce:
+
+1. `config.py` dosyasını ayarlarınızla oluşturun:
+```python
+from config import OLLAMA_CONFIG, API_KEYS, MODEL_PARAMS, TOOL_FUNCTIONS, API_ENDPOINTS, ERROR_MESSAGES
+```
+
+2. Yapılandırmayı gerçek değerlerinizle güncelleyin:
+   - Ollama sunucu URL'nizi `OLLAMA_CONFIG["base_url"]` içinde ayarlayın
+   - API anahtarlarınızı `API_KEYS` içine ekleyin
+   - Gerekirse `MODEL_PARAMS` içindeki model parametrelerini ayarlayın
+
+## Temel Örnek
+
+```python
+import ollama
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
+
+# Ollama örneğiniz için temel URL'yi yapılandırın
+ollama.set_host(OLLAMA_CONFIG["base_url"])
+
+response = ollama.chat(
+    model=OLLAMA_CONFIG["default_model"],
+    messages=[{'role': 'user', 'content': 'Toronto\'da hava nasıl?'}],
+    tools=[{
+      'type': 'function',
+      'function': TOOL_FUNCTIONS["get_current_weather"]
+    }],
+)
+
+print(response['message']['tool_calls'])
+```
+
+> [!NOTE]
+> Örnekleri çalıştırmadan önce `config.py` dosyasını gerçek Ollama sunucu URL'niz ve API anahtarlarınızla güncellediğinizden emin olun.
 
 ## İçindekiler
 
@@ -241,26 +290,17 @@ OpenAI uyumluluk katmanı özellikle önemlidir, mevcut araçlar ve kütüphanel
 
 ```python
 import ollama
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
+
+# Ollama örneğiniz için temel URL'yi yapılandırın
+ollama.set_host(OLLAMA_CONFIG["base_url"])
 
 response = ollama.chat(
-    model='llama3.1',
-    messages=[{'role': 'user', 'content': 'Toronto\'da hava durumu nasıl?'}],
+    model=OLLAMA_CONFIG["default_model"],
+    messages=[{'role': 'user', 'content': 'Toronto\'da hava nasıl?'}],
     tools=[{
       'type': 'function',
-      'function': {
-        'name': 'get_current_weather',
-        'description': 'Bir şehir için mevcut hava durumunu al',
-        'parameters': {
-          'type': 'object',
-          'properties': {
-            'city': {
-              'type': 'string',
-              'description': 'Şehir adı',
-            },
-          },
-          'required': ['city'],
-        },
-      },
+      'function': TOOL_FUNCTIONS["get_current_weather"]
     }],
 )
 
@@ -271,34 +311,26 @@ print(response['message']['tool_calls'])
 
 ```python
 import openai
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
-openai.base_url = "http://localhost:11434/v1"
+# Ollama örneğiniz için temel URL'yi yapılandırın
+openai.base_url = f"{OLLAMA_CONFIG['base_url']}/v1"
 openai.api_key = 'ollama'
 
 response = openai.chat.completions.create(
-    model="llama3.1",
-    messages=[{"role": "user", "content": "New York'ta hava durumu nasıl?"}],
+    model=OLLAMA_CONFIG["default_model"],
+    messages=[{"role": "user", "content": "New York'ta hava nasıl?"}],
     tools=[{
       "type": "function",
-      "function": {
-        "name": "get_current_weather",
-        "description": "Bir şehir için mevcut hava durumunu al",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "city": {
-              "type": "string",
-              "description": "Şehir adı",
-            },
-          },
-          "required": ["city"],
-        },
-      },
+      "function": TOOL_FUNCTIONS["get_current_weather"]
     }],
 )
 
 print(response.choices[0].message.tool_calls)
 ```
+
+> [!NOTE]
+> Örnekleri çalıştırmadan önce `config.py` dosyasını gerçek Ollama sunucu URL'niz ve API anahtarlarınızla güncellediğinizden emin olun.
 
 ## Araç Yürütme İş Akışı
 
@@ -347,32 +379,20 @@ Araçların gerçek yürütülmesi istemci uygulamanın sorumluluğundadır. İ�
 
 ```python
 import ollama
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
-# 1. Uygulamanızda aracınızın uygulamasını tanımla
+# 1. Uygulamanızda araç uygulamanızı tanımlayın
 def get_weather(city):
-    # Gerçek API çağrınız veya fonksiyon uygulamanız
+    # Gerçek API çağrısı veya fonksiyon uygulaması
     return f"{city}'de hava 22°C ve güneşli"
 
-# 2. LLM için aracı tanımla
+# 2. LLM için aracı tanımlayın
 response = ollama.chat(
-    model='llama3.1',
-    messages=[{'role': 'user', 'content': 'Toronto\'da hava durumu nasıl?'}],
+    model=OLLAMA_CONFIG["default_model"],
+    messages=[{'role': 'user', 'content': 'Toronto\'da hava nasıl?'}],
     tools=[{
       'type': 'function',
-      'function': {
-        'name': 'get_current_weather',
-        'description': 'Bir şehir için mevcut hava durumunu al',
-        'parameters': {
-          'type': 'object',
-          'properties': {
-            'city': {
-              'type': 'string',
-              'description': 'Şehir adı',
-            },
-          },
-          'required': ['city'],
-        },
-      },
+      'function': TOOL_FUNCTIONS["get_current_weather"]
     }],
 )
 
@@ -380,16 +400,16 @@ response = ollama.chat(
 if 'tool_calls' in response['message']:
     tool_calls = response['message']['tool_calls']
     for tool_call in tool_calls:
-        # 4. Aracı uygulamanızda yürüt
+        # 4. Aracı uygulamanızda çalıştırın
         if tool_call['function']['name'] == 'get_current_weather':
             city = tool_call['function']['arguments']['city']
-            weather_info = get_weather(city)  # Bu kodunuzda gerçekleşir!
+            weather_info = get_weather(city)  # Bu sizin kodunuzda gerçekleşir!
             
-            # 5. Sonucu LLM'e geri gönder
+            # 5. Sonucu LLM'e geri gönderin
             final_response = ollama.chat(
-                model='llama3.1',
+                model=OLLAMA_CONFIG["default_model"],
                 messages=[
-                    {'role': 'user', 'content': 'Toronto\'da hava durumu nasıl?'},
+                    {'role': 'user', 'content': 'Toronto\'da hava nasıl?'},
                     response['message'],
                     {'role': 'tool', 'content': weather_info}  # Araç sonucu
                 ]
@@ -407,8 +427,9 @@ Bazı modeller tek bir yanıtta birden fazla araç çağrısı döndürebilir. U
 
 ```python
 import ollama
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
-# Araçlarınızın uygulaması
+# Araçların uygulaması
 def get_weather(city):
     return f"{city}'de hava 22°C ve güneşli"
 
@@ -420,44 +441,18 @@ def get_population(city):
     }
     return populations.get(city, f"{city} için nüfus verisi mevcut değil")
 
-# Birden fazla araç tanımla
+# Birden fazla aracı tanımlayın
 response = ollama.chat(
-    model='llama3.1',
-    messages=[{'role': 'user', 'content': 'Toronto\'da hava durumu ve nüfus nasıl?'}],
+    model=OLLAMA_CONFIG["default_model"],
+    messages=[{'role': 'user', 'content': 'Toronto\'da hava ve nüfus nasıl?'}],
     tools=[
         {
             'type': 'function',
-            'function': {
-                'name': 'get_current_weather',
-                'description': 'Bir şehir için mevcut hava durumunu al',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'city': {
-                            'type': 'string',
-                            'description': 'Şehir adı',
-                        },
-                    },
-                    'required': ['city'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["get_current_weather"]
         },
         {
             'type': 'function',
-            'function': {
-                'name': 'get_population',
-                'description': 'Bir şehir için nüfus bilgisini al',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'city': {
-                            'type': 'string',
-                            'description': 'Şehir adı',
-                        },
-                    },
-                    'required': ['city'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["get_population"]
         }
     ],
 )
@@ -468,7 +463,7 @@ if 'tool_calls' in response['message']:
     
     # Geri gönderilecek tüm mesajları sakla
     conversation = [
-        {'role': 'user', 'content': 'Toronto\'da hava durumu ve nüfus nasıl?'},
+        {'role': 'user', 'content': 'Toronto\'da hava ve nüfus nasıl?'},
         response['message']
     ]
     
@@ -487,7 +482,7 @@ if 'tool_calls' in response['message']:
     
     # Tüm araç sonuçlarını modele gönder
     final_response = ollama.chat(
-        model='llama3.1',
+        model=OLLAMA_CONFIG["default_model"],
         messages=conversation
     )
     
@@ -500,116 +495,88 @@ Daha karmaşık senaryolarda, model önceki sonuçlara dayanarak bir dizi araç 
 
 ```python
 import ollama
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
 # Araç uygulamaları
 def search_database(query):
     # Simüle edilmiş veritabanı araması
-    if "ürün" in query:
+    if "product" in query:
         return "Bulunan ürünler: Widget A, Widget B ve Widget C"
-    return "Arama için sonuç bulunamadı: " + query
+    return "Arama sonucu bulunamadı: " + query
 
 def get_product_details(product_id):
     # Simüle edilmiş ürün detayları araması
     products = {
-        "Widget A": {"fiyat": "$10.99", "stok": 42, "kategori": "Araçlar"},
-        "Widget B": {"fiyat": "$24.99", "stok": 7, "kategori": "Elektronik"},
-        "Widget C": {"fiyat": "$5.50", "stok": 0, "kategori": "Ofis Malzemeleri"}
+        "Widget A": {"price": "$10.99", "stock": 42, "category": "Araçlar"},
+        "Widget B": {"price": "$24.99", "stock": 7, "category": "Elektronik"},
+        "Widget C": {"price": "$5.50", "stock": 0, "category": "Ofis Malzemeleri"}
     }
     return str(products.get(product_id, "Ürün bulunamadı"))
 
-# İlk araç tanımları
+# İlk araçlar tanımı
 tools = [
     {
         'type': 'function',
-        'function': {
-            'name': 'search_database',
-            'description': 'Veritabanında ürün ara',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'query': {
-                        'type': 'string',
-                        'description': 'Arama sorgusu',
-                    },
-                },
-                'required': ['query'],
-            },
-        },
+        'function': TOOL_FUNCTIONS["search_database"]
     },
     {
         'type': 'function',
-        'function': {
-            'name': 'get_product_details',
-            'description': 'Belirli bir ürün hakkında detayları al',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'product_id': {
-                        'type': 'string',
-                        'description': 'Ürün tanımlayıcısı',
-                    },
-                },
-                'required': ['product_id'],
-            },
-        },
+        'function': TOOL_FUNCTIONS["get_product_details"]
     }
 ]
 
 # İlk konuşma
 conversation = [
-    {'role': 'user', 'content': 'Stokta olan widget\'lar hakkında bilgi istiyorum'}
+    {'role': 'user', 'content': 'Stokta olan widget\'lar hakkında detay istiyorum'}
 ]
 
 # İlk API çağrısı - model muhtemelen önce arama yapacak
 response = ollama.chat(
-    model='llama3.1',
+    model=OLLAMA_CONFIG["default_model"],
     messages=conversation,
     tools=tools
 )
 
-# Yanıtı konuşmaya ekle
-conversation.append(response['message'])
-
-# İlk araç çağrısını işle (muhtemelen arama)
+# Araç çağrılarını işle
 if 'tool_calls' in response['message']:
-    tool_call = response['message']['tool_calls'][0]  # İlk araç çağrısını al
+    conversation.append(response['message'])
     
-    if tool_call['function']['name'] == 'search_database':
-        query = tool_call['function']['arguments']['query']
-        search_result = search_database(query)
+    for tool_call in response['message']['tool_calls']:
+        function_name = tool_call['function']['name']
+        args = tool_call['function']['arguments']
         
-        # Araç sonucunu konuşmaya ekle
-        conversation.append({'role': 'tool', 'content': search_result})
+        if function_name == 'search_database':
+            search_results = search_database(args['query'])
+            conversation.append({'role': 'tool', 'content': search_results})
         
-        # İkinci API çağrısı - model muhtemelen şimdi ürün detaylarını isteyecek
-        response2 = ollama.chat(
-            model='llama3.1',
-            messages=conversation,
-            tools=tools
-        )
-        
-        # İkinci yanıtı konuşmaya ekle
-        conversation.append(response2['message'])
-        
-        # İkinci araç çağrısını işle (muhtemelen ürün detayları)
-        if 'tool_calls' in response2['message']:
-            tool_call2 = response2['message']['tool_calls'][0]
-            
-            if tool_call2['function']['name'] == 'get_product_details':
-                product_id = tool_call2['function']['arguments']['product_id']
-                product_details = get_product_details(product_id)
-                
-                # Araç sonucunu konuşmaya ekle
-                conversation.append({'role': 'tool', 'content': product_details})
-                
-                # Tüm bilgilerle son yanıt
-                final_response = ollama.chat(
-                    model='llama3.1',
-                    messages=conversation,
-                    tools=tools
-                )
-                
-                print(final_response['message']['content'])
+        elif function_name == 'get_product_details':
+            product_details = get_product_details(args['product_id'])
+            conversation.append({'role': 'tool', 'content': product_details})
+
+    # Son yanıtı al
+    final_response = ollama.chat(
+        model=OLLAMA_CONFIG["default_model"],
+        messages=conversation
+    )
+    print(final_response['message']['content'])
+
+# Örnek kullanım
+if __name__ == "__main__":
+    # API anahtarlarını config'den al
+    OPENWEATHER_API_KEY = API_KEYS["openweather"]
+    ALPHA_VANTAGE_API_KEY = API_KEYS["alpha_vantage"]
+    NEWS_API_KEY = API_KEYS["news_api"]
+    
+    # Örnek sorgular
+    queries = [
+        "Tokyo'da hava nasıl ve kuantum bilgisayarlar konusunda son gelişmeler neler?",
+        "İklim değişikliğinin kutup ayıları üzerindeki etkisini araştır ve bulguları analiz et",
+        "AB'de yapay zeka düzenlemelerinin mevcut durumu nedir ve başlangıç şirketlerini nasıl etkiliyor?"
+    ]
+    
+    for query in queries:
+        print(f"\nSorgu işleniyor: {query}")
+        execute_research_task(query)
 ```
 
 ### Çoklu Araç Kullanımı için Önemli Noktalar
@@ -620,7 +587,7 @@ if 'tool_calls' in response['message']:
 4. **Hata Yönetimi**: Araç yürütmesinin başarısız olduğu durumlar için sağlam hata yönetimi uygulayın
 5. **Paralel vs. Sıralı**: Birden fazla araç çağrısını paralel mi yoksa sırayla mı yürüteceğinize karar verin
 
-Çoklu araç kullanımı, LLM'lerin karmaşık görevleri daha basit işlemlere bölerek, her biri özel araçlar tarafından işlenerek gerçekleştirmesine olanak sağlar.
+Çoklu araç kullanımı, LLM'lerin karmaşık görevleri daha basit işlemlere bölerek, her birinin özel araçlar tarafından işlenerek gerçekleştirmesine olanak sağlar.
 
 ## Hiyerarşik Ajan Araç Kullanımı
 
@@ -939,6 +906,7 @@ def get_weather(city: str) -> str:
 def analyze_text(text: str) -> str:
     """Ollama kullanarak metni analiz et"""
     response = ollama.chat(
+        host="http://your-ollama-url:11434",  # Ollama URL'nizi buraya yazın
         model='llama3.1',
         messages=[{
             'role': 'user',
@@ -1119,6 +1087,7 @@ def get_forex_data(from_symbol: str, to_symbol: str) -> str:
 def analyze_financial_data(data: str) -> str:
     """Ollama kullanarak finansal veriyi analiz et"""
     response = ollama.chat(
+        host="http://your-ollama-url:11434",  # Ollama URL'nizi buraya yazın
         model='llama3.1',
         messages=[{
             'role': 'user',
@@ -1308,10 +1277,11 @@ Bileşik: {sentiment['compound']:.2f}
 def summarize_text(text: str) -> str:
     """Ollama kullanarak metni özetle"""
     response = ollama.chat(
+        host="http://your-ollama-url:11434",  # Ollama URL'nizi buraya yazın
         model='llama3.1',
         messages=[{
             'role': 'user',
-            'content': f"Bu metni özetle:\n\n{text}"
+            'content': f"Bu metni özlü bir şekilde özetle:\n\n{text}"
         }]
     )
     return response['message']['content']
@@ -1466,7 +1436,7 @@ Kod çalıştırılmaya hazırdır ve gerektiğinde ek araçlar ve yeteneklerle 
 
 ## Sonuç
 
-Ollama'nın araç fonksiyonları uygulaması şunları birleştiren sofistike bir sistemdir:
+Ollama'nın araç fonksiyonu uygulaması şunları birleştiren sofistike bir sistemdir:
 
 1. **Esnek Şablonlar**: Model-spesifik istem biçimlendirmeye olanak sağlar
 2. **Akıllı Ayrıştırma**: Model çıktılarından yapılandırılmış veri çıkarır
