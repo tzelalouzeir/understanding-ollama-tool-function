@@ -28,13 +28,20 @@ from config import OLLAMA_CONFIG, API_KEYS, MODEL_PARAMS, TOOL_FUNCTIONS, API_EN
 ## Basic Example
 
 ```python
-import ollama
+from ollama import Client
 from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
-# Configure the base URL for your Ollama instance
-ollama.set_host(OLLAMA_CONFIG["base_url"])
+# Configure Ollama using environment variables
+# For Mac: launchctl setenv OLLAMA_HOST "0.0.0.0:11434"
+# For Linux: Add Environment="OLLAMA_HOST=0.0.0.0:11434" in systemd service
+# For Windows: Set OLLAMA_HOST in system environment variables
+# 
+# Alternative: Configure the API client with the base URL directly
+client = Client(
+    host=OLLAMA_CONFIG["base_url"]
+)
 
-response = ollama.chat(
+response = client.chat(
     model=OLLAMA_CONFIG["default_model"],
     messages=[{'role': 'user', 'content': 'What is the weather in Toronto?'}],
     tools=[{
@@ -291,13 +298,15 @@ The OpenAI compatibility layer is particularly important, allowing seamless inte
 ### Python Example
 
 ```python
-import ollama
+from ollama import Client
 from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
-# Configure the base URL for your Ollama instance
-ollama.set_host(OLLAMA_CONFIG["base_url"])
+# Create a client with the base URL configuration
+client = Client(
+    host=OLLAMA_CONFIG["base_url"]
+)
 
-response = ollama.chat(
+response = client.chat(
     model=OLLAMA_CONFIG["default_model"],
     messages=[{'role': 'user', 'content': 'What is the weather in Toronto?'}],
     tools=[{
@@ -380,7 +389,7 @@ The actual execution of tools is the responsibility of the client application. H
 ### Example Execution Flow
 
 ```python
-import ollama
+from ollama import Client
 from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
 # 1. Define your tool implementation in your application
@@ -388,8 +397,13 @@ def get_weather(city):
     # Your actual API call or function implementation
     return f"It's 22°C and sunny in {city}"
 
-# 2. Define the tool for the LLM
-response = ollama.chat(
+# 2. Create a client with the base URL configuration
+client = Client(
+    host=OLLAMA_CONFIG["base_url"]
+)
+
+# 3. Make a request to the LLM
+response = client.chat(
     model=OLLAMA_CONFIG["default_model"],
     messages=[{'role': 'user', 'content': 'What is the weather in Toronto?'}],
     tools=[{
@@ -398,17 +412,17 @@ response = ollama.chat(
     }],
 )
 
-# 3. Check if the LLM wants to use a tool
+# 4. Check if the LLM wants to use a tool
 if 'tool_calls' in response['message']:
     tool_calls = response['message']['tool_calls']
     for tool_call in tool_calls:
-        # 4. Execute the tool in your application
+        # 5. Execute the tool in your application
         if tool_call['function']['name'] == 'get_current_weather':
             city = tool_call['function']['arguments']['city']
             weather_info = get_weather(city)  # This happens in your code!
             
-            # 5. Send the result back to the LLM
-            final_response = ollama.chat(
+            # 6. Send the result back to the LLM
+            final_response = client.chat(
                 model=OLLAMA_CONFIG["default_model"],
                 messages=[
                     {'role': 'user', 'content': 'What is the weather in Toronto?'},
@@ -428,7 +442,7 @@ Ollama supports scenarios where a model might need to call multiple tools, eithe
 Some models can return multiple tool calls in a single response. Your application needs to handle each tool call individually:
 
 ```python
-import ollama
+from ollama import Client
 from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
 # Implementation of your tools
@@ -443,8 +457,12 @@ def get_population(city):
     }
     return populations.get(city, f"Population data for {city} not available")
 
+client = Client(
+    host=OLLAMA_CONFIG["base_url"]
+)
+
 # Define multiple tools
-response = ollama.chat(
+response = client.chat(
     model=OLLAMA_CONFIG["default_model"],
     messages=[{'role': 'user', 'content': 'What is the weather and population in Toronto?'}],
     tools=[
@@ -483,7 +501,7 @@ if 'tool_calls' in response['message']:
             conversation.append({'role': 'tool', 'content': result})
     
     # Send all tool results back to the model
-    final_response = ollama.chat(
+    final_response = client.chat(
         model=OLLAMA_CONFIG["default_model"],
         messages=conversation
     )
@@ -496,13 +514,13 @@ if 'tool_calls' in response['message']:
 In more complex scenarios, the model might need to make a sequence of tool calls based on previous results:
 
 ```python
-import ollama
+from ollama import Client
 from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
 # Tool implementations
 def search_database(query):
-    # Simulated database search
-    if "product" in query:
+    # Always return product results for widget-related queries
+    if "widget" in query.lower() or "product" in query.lower():
         return "Found products: Widget A, Widget B, and Widget C"
     return "No results found for: " + query
 
@@ -514,6 +532,11 @@ def get_product_details(product_id):
         "Widget C": {"price": "$5.50", "stock": 0, "category": "Office Supplies"}
     }
     return str(products.get(product_id, "Product not found"))
+
+# Initialize the client with base URL
+client = Client(
+    host=OLLAMA_CONFIG["base_url"]
+)
 
 # Initial tools definition
 tools = [
@@ -532,8 +555,9 @@ conversation = [
     {'role': 'user', 'content': 'I need details about widgets in stock'}
 ]
 
+print("1. Sending initial request to Ollama...")
 # First API call - model likely needs to search first
-response = ollama.chat(
+response = client.chat(
     model=OLLAMA_CONFIG["default_model"],
     messages=conversation,
     tools=tools
@@ -541,20 +565,25 @@ response = ollama.chat(
 
 # Add the response to the conversation
 conversation.append(response['message'])
+print("2. Received initial response from Ollama")
 
 # Process first tool call (likely search)
 if 'tool_calls' in response['message']:
+    print(f"3. Tool calls detected: {response['message']['tool_calls']}")
     tool_call = response['message']['tool_calls'][0]  # Get first tool call
     
     if tool_call['function']['name'] == 'search_database':
         query = tool_call['function']['arguments']['query']
+        print(f"4. Executing search_database with query: {query}")
         search_result = search_database(query)
+        print(f"5. Search result: {search_result}")
         
         # Add the tool result to the conversation
         conversation.append({'role': 'tool', 'content': search_result})
         
+        print("6. Sending second request to Ollama...")
         # Second API call - model likely will ask for product details now
-        response2 = ollama.chat(
+        response2 = client.chat(
             model=OLLAMA_CONFIG["default_model"],
             messages=conversation,
             tools=tools
@@ -562,26 +591,42 @@ if 'tool_calls' in response['message']:
         
         # Add the second response to the conversation
         conversation.append(response2['message'])
+        print("7. Received second response from Ollama")
         
         # Process second tool call (likely product details)
         if 'tool_calls' in response2['message']:
+            print(f"8. Second tool calls detected: {response2['message']['tool_calls']}")
             tool_call2 = response2['message']['tool_calls'][0]
             
             if tool_call2['function']['name'] == 'get_product_details':
                 product_id = tool_call2['function']['arguments']['product_id']
+                print(f"9. Executing get_product_details with product_id: {product_id}")
                 product_details = get_product_details(product_id)
+                print(f"10. Product details: {product_details}")
                 
                 # Add the tool result to the conversation
                 conversation.append({'role': 'tool', 'content': product_details})
                 
+                print("11. Sending final request to Ollama...")
                 # Final response with all the information
-                final_response = ollama.chat(
+                final_response = client.chat(
                     model=OLLAMA_CONFIG["default_model"],
                     messages=conversation,
                     tools=tools
                 )
                 
+                print("\n=== Final Response ===")
                 print(final_response['message']['content'])
+            else:
+                print(f"Error: Unexpected second tool call: {tool_call2['function']['name']}")
+        else:
+            print("Error: No tool calls found in second response")
+            print(f"Second response content: {response2['message']['content']}")
+    else:
+        print(f"Error: Unexpected first tool call: {tool_call['function']['name']}")
+else:
+    print("Error: No tool calls found in initial response")
+    print(f"Initial response content: {response['message']['content']}")
 ```
 
 ### Key Considerations for Multiple Tool Usage
@@ -628,8 +673,26 @@ Ollama's tool function system can be extended to support hierarchical agents, wh
 ### Implementation Example
 
 ```python
-import ollama
+from ollama import Client
 from typing import List, Dict, Any
+from config import OLLAMA_CONFIG
+import json
+import logging
+
+# Set up logging to capture all output
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s',
+    handlers=[
+        logging.FileHandler("hierarchical_agent_log.txt", mode='w'),
+        logging.StreamHandler()
+    ]
+)
+
+# Initialize the client with base URL
+client = Client(
+    host=OLLAMA_CONFIG["base_url"]
+)
 
 class Agent:
     def __init__(self, name: str, role: str, tools: List[Dict[str, Any]]):
@@ -640,14 +703,28 @@ class Agent:
 
     def add_message(self, role: str, content: str):
         self.conversation.append({"role": role, "content": content})
+        log_msg = f"[{self.name}] Added {role} message: {content[:50]}..." if len(content) > 50 else f"[{self.name}] Added {role} message: {content}"
+        logging.info(log_msg)
 
-    def chat(self, model: str = 'llama3.1') -> Dict[str, Any]:
-        response = ollama.chat(
+    def chat(self, model: str = OLLAMA_CONFIG["default_model"]) -> Dict[str, Any]:
+        logging.info(f"[{self.name}] Sending request to Ollama...")
+        client = Client(
+            host=OLLAMA_CONFIG["base_url"]
+        )
+        response = client.chat(
             model=model,
             messages=self.conversation,
             tools=self.tools
         )
-        self.add_message("assistant", response['message']['content'])
+        
+        # Check if we got a proper response
+        if 'message' in response and 'content' in response['message']:
+            self.add_message("assistant", response['message']['content'])
+            log_msg = f"[{self.name}] Received response from Ollama: {response['message']['content'][:50]}..." if len(response['message']['content']) > 50 else f"[{self.name}] Received response from Ollama: {response['message']['content']}"
+            logging.info(log_msg)
+        else:
+            logging.info(f"[{self.name}] Warning: Received incomplete response from Ollama")
+            
         return response
 
 class CoordinatorAgent(Agent):
@@ -669,8 +746,9 @@ class CoordinatorAgent(Agent):
                                     'description': 'The task to delegate',
                                 },
                                 'agent': {
-                                    'type': 'string',
+                                    'type': 'string', 
                                     'description': 'The specialized agent to handle the task',
+                                    'enum': ['Researcher', 'Analyst']
                                 },
                                 'context': {
                                     'type': 'string',
@@ -735,6 +813,7 @@ class AnalysisAgent(Agent):
                                 'analysis_type': {
                                     'type': 'string',
                                     'description': 'Type of analysis to perform',
+                                    'enum': ['trend', 'summary', 'prediction', 'comparison']
                                 }
                             },
                             'required': ['data', 'analysis_type'],
@@ -744,111 +823,219 @@ class AnalysisAgent(Agent):
             ]
         )
 
+def search_database(query, filters=None):
+    """Actual implementation of the search database function"""
+    logging.info(f"[Function] Executing search_database with query: {query}")
+    if "electric" in query.lower() or "ev" in query.lower() or "vehicle" in query.lower():
+        return """
+        Search results for electric vehicles market trends:
+        1. Global EV sales grew by 40% in 2022 compared to 2021
+        2. Tesla maintains market leadership with 18% global market share
+        3. China represents the largest EV market with over 50% of global sales
+        4. European EV adoption increased by 15% year-over-year
+        5. Battery costs have decreased by 35% over the past 5 years
+        """
+    return f"Search results for {query}: No specific data found. Please refine your search."
+
+def analyze_data(data, analysis_type):
+    """Actual implementation of the analyze data function"""
+    logging.info(f"[Function] Executing analyze_data with type: {analysis_type}")
+    if analysis_type == "trend":
+        return """
+        Trend Analysis of EV Market:
+        - Consistent upward trajectory in global adoption rates
+        - Accelerating growth in developing markets
+        - Shift from sedans to SUV and crossover EV models
+        - Increasing focus on battery technology and charging infrastructure
+        - Growing competition with over 20 new EV models introduced annually
+        """
+    elif analysis_type == "summary":
+        return """
+        Summary of EV Market:
+        - Total market value exceeds $500 billion globally
+        - Major players include Tesla, BYD, Volkswagen Group, and GM
+        - Battery electric vehicles dominate over plug-in hybrids
+        - Government incentives remain a key driver of adoption
+        """
+    elif analysis_type == "prediction":
+        return """
+        Market Predictions for EV Sector:
+        - Projected 25% annual growth rate through 2027
+        - Battery price parity with ICE vehicles expected by 2025
+        - Autonomous driving features to become standard in premium EV models
+        - Solid-state battery technology breakthrough expected within 3 years
+        """
+    else:
+        return f"Analysis of data using {analysis_type} method: Generic analysis results based on the provided data."
+
 def execute_hierarchical_task(user_query: str):
+    """Execute a task using hierarchical agents with proper error handling and debug output"""
+    logging.info("\n=== Starting Hierarchical Task Execution ===")
+    logging.info(f"User Query: {user_query}")
+    
     # Initialize agents
     coordinator = CoordinatorAgent()
     researcher = ResearchAgent()
     analyst = AnalysisAgent()
 
-    # Start with the coordinator
-    coordinator.add_message("user", user_query)
+    # Start with the coordinator 
+    coordinator.add_message("user", f"""
+Task: Research and analyze the market trends for electric vehicles in the last 5 years
+Instructions:
+1. First delegate the research task to the Researcher agent (only use 'Researcher' as the agent name)
+2. The Researcher should search for information about electric vehicle market trends
+3. Then delegate the analysis task to the Analyst agent (only use 'Analyst' as the agent name)
+4. Finally, compile the results into a comprehensive report
+
+Available agents: 'Researcher' and 'Analyst' only. Do not use any other agent names.
+""")
     coordinator_response = coordinator.chat()
+    
+    # Default response in case the flow doesn't complete
+    final_result = "No response generated. The agent workflow may not have completed properly."
 
-    # Process coordinator's response
-    if 'tool_calls' in coordinator_response['message']:
-        for tool_call in coordinator_response['message']['tool_calls']:
-            if tool_call['function']['name'] == 'delegate_task':
-                args = tool_call['function']['arguments']
-                task = args['task']
-                agent_name = args['agent']
-                context = args['context']
+    # Process coordinator's response 
+    if 'message' not in coordinator_response or 'tool_calls' not in coordinator_response['message']:
+        logging.info("[Error] Coordinator did not make any tool calls. Response content:")
+        if 'message' in coordinator_response and 'content' in coordinator_response['message']:
+            logging.info(coordinator_response['message']['content'])
+        return coordinator_response['message']['content'] if 'message' in coordinator_response and 'content' in coordinator_response['message'] else final_result
+    
+    # Extract tool calls
+    for tool_call in coordinator_response['message']['tool_calls']:
+        if tool_call['function']['name'] == 'delegate_task':
+            args = tool_call['function']['arguments']
+            task = args.get('task', 'Unknown task')
+            agent_name = args.get('agent', 'Unknown agent')
+            context = args.get('context', 'No context provided')
+            
+            logging.info(f"[Coordinator] Delegating task '{task}' to {agent_name}")
 
-                # Route task to appropriate agent
-                if agent_name == "Researcher":
-                    researcher.add_message("user", f"Task: {task}\nContext: {context}")
-                    research_response = researcher.chat()
+            # Route task to appropriate agent
+            if agent_name == "Researcher":
+                researcher.add_message("user", f"Task: {task}\nContext: {context}")
+                research_response = researcher.chat()
+                
+                if 'message' not in research_response or 'tool_calls' not in research_response['message']:
+                    logging.info("[Error] Researcher did not make any tool calls")
+                    coordinator.add_message("tool", "The researcher was unable to complete the task.")
+                    final_response = coordinator.chat()
+                    return final_response['message']['content'] if 'message' in final_response and 'content' in final_response['message'] else final_result
+                
+                for research_tool in research_response['message']['tool_calls']:
+                    if research_tool['function']['name'] == 'search_database':
+                        search_args = research_tool['function']['arguments']
+                        query = search_args.get('query', 'default search')
+                        filters = search_args.get('filters', None)
+                        
+                        # Execute search and get results
+                        search_results = search_database(query, filters)
+                        researcher.add_message("tool", search_results)
+                        
+                        # Get researcher's final thoughts
+                        researcher_final = researcher.chat()
+                        research_conclusion = researcher_final['message']['content']
+                        
+                        # Send results to the analyst with explicit instructions
+                        analyst.add_message("user", f"""Task: Analyze the following research data on electric vehicle market trends.
+
+Research data:
+{search_results}
+
+Researcher's conclusion:
+{research_conclusion}
+
+Instructions:
+1. Please analyze this data using the 'analyze_data' function
+2. Use analysis_type 'trend' to analyze trends in the electric vehicle market
+3. Your response MUST call the analyze_data function with appropriate parameters
+4. Do not provide analysis directly in your response - use the tool function instead
+""")
+                        analysis_response = analyst.chat()
+                        
+                        if 'message' not in analysis_response or 'tool_calls' not in analysis_response['message']:
+                            logging.info("[Error] Analyst did not make any tool calls")
+                            logging.info(f"Analyst response: {json.dumps(analysis_response, indent=2)}")
+                            coordinator.add_message("tool", f"Research results: {search_results}\n\nThe analyst was unable to complete the analysis.")
+                            final_response = coordinator.chat()
+                            return final_response['message']['content'] if 'message' in final_response and 'content' in final_response['message'] else final_result
+                        
+                        for analysis_tool in analysis_response['message']['tool_calls']:
+                            if analysis_tool['function']['name'] == 'analyze_data':
+                                analysis_args = analysis_tool['function']['arguments']
+                                data = analysis_args.get('data', search_results)
+                                analysis_type = analysis_args.get('analysis_type', 'trend')
+                                
+                                # Execute analysis and get results
+                                analysis_results = analyze_data(data, analysis_type)
+                                analyst.add_message("tool", analysis_results)
+                                
+                                # Get analyst's final thoughts
+                                analyst_final = analyst.chat()
+                                analysis_conclusion = analyst_final['message']['content']
+                                
+                                # Send results back to coordinator
+                                coordinator.add_message("tool", f"Research results: {search_results}\n\nAnalysis results: {analysis_results}\n\nAnalyst's conclusion: {analysis_conclusion}")
+                                final_response = coordinator.chat()
+                                final_result = final_response['message']['content']
+                                
+                                logging.info("\n=== Final Response ===")
+                                logging.info(final_result)
+                                return final_result
+            
+            elif agent_name == "Analyst":
+                # Handle direct delegation to analyst if needed
+                analyst.add_message("user", f"""Task: {task}
+Context: {context}
+
+Instructions:
+1. You MUST use the analyze_data function to perform your analysis
+2. Select an appropriate analysis_type from: 'trend', 'summary', 'prediction', or 'comparison'
+3. Do not provide analysis directly - use the tool function
+""")
+                analysis_response = analyst.chat()
+                
+                if 'message' in analysis_response and 'content' in analysis_response['message']:
+                    coordinator.add_message("tool", f"Analyst's response: {analysis_response['message']['content']}")
+                    final_response = coordinator.chat()
+                    final_result = final_response['message']['content']
                     
-                    if 'tool_calls' in research_response['message']:
-                        for research_tool in research_response['message']['tool_calls']:
-                            if research_tool['function']['name'] == 'search_database':
-                                search_args = research_tool['function']['arguments']
-                                # Execute search and get results
-                                search_results = "Sample search results..."  # Replace with actual search
-                                
-                                # Delegate analysis to the analyst
-                                analyst.add_message("user", f"Analyze this data: {search_results}")
-                                analysis_response = analyst.chat()
-                                
-                                if 'tool_calls' in analysis_response['message']:
-                                    for analysis_tool in analysis_response['message']['tool_calls']:
-                                        if analysis_tool['function']['name'] == 'analyze_data':
-                                            analysis_args = analysis_tool['function']['arguments']
-                                            # Execute analysis and get results
-                                            analysis_results = "Sample analysis results..."  # Replace with actual analysis
-                                            
-                                            # Send results back to coordinator
-                                            coordinator.add_message("tool", f"Research and analysis results: {analysis_results}")
-                                            final_response = coordinator.chat()
-                                            print(final_response['message']['content'])
+                    logging.info("\n=== Final Response ===")
+                    logging.info(final_result)
+                    return final_result
+            
+            else:
+                logging.info(f"[Error] Unknown agent type: {agent_name}")
+                coordinator.add_message("tool", f"Error: Agent {agent_name} not found.")
+                final_response = coordinator.chat()
+                return final_response['message']['content'] if 'message' in final_response and 'content' in final_response['message'] else final_result
+        
+        else:
+            logging.info(f"[Error] Unknown tool call from coordinator: {tool_call['function']['name']}")
+    
+    logging.info("[Warning] No complete workflow was executed.")
+    return final_result
 
-# Example usage
-execute_hierarchical_task("Research and analyze the market trends for electric vehicles in the last 5 years")
+if __name__ == "__main__":
+    # Example usage
+    result = execute_hierarchical_task("Research and analyze the market trends for electric vehicles in the last 5 years")
+    print("\n=== Task Complete ===")
 ```
 
-### Key Features of Hierarchical Agent Implementation
+### Key Features of Hierarchical Agent Structure
 
-1. **Agent Specialization**:
-   - Each agent has specific tools and capabilities
-   - Agents can be designed for different domains (research, analysis, decision-making, etc.)
+1. **Agent Specialization**: Each agent has specific tools and capabilities
+2. **Task Delegation**: The coordinator agent decides which specialists to assign tasks to
+3. **Conversation Management**: Each agent maintains its own conversation history
+4. **Error Handling**: Comprehensive checks to ensure the flow completes even if one agent fails
+5. **Scalability**: The pattern can be extended to include more specialized agents or deeper hierarchies
 
-2. **Task Delegation**:
-   - Coordinator agent can delegate tasks to specialized agents
-   - Tasks can be broken down into subtasks
-   - Results can be aggregated and synthesized
+Hierarchical agent tool usage allows for complex task processing by breaking tasks down and delegating to specialized agents. This approach is particularly useful for:
 
-3. **Conversation Management**:
-   - Each agent maintains its own conversation history
-   - Results are passed between agents through structured messages
-   - Context is preserved throughout the task execution
-
-4. **Error Handling and Recovery**:
-   - Each agent can handle errors independently
-   - Failed tasks can be retried or delegated to alternative agents
-   - Results can be validated at each step
-
-5. **Scalability**:
-   - New agents can be added to handle different types of tasks
-   - Agents can be organized in different hierarchies
-   - Tasks can be processed in parallel or sequence
-
-### Best Practices for Hierarchical Agent Implementation
-
-1. **Clear Agent Roles**:
-   - Define specific responsibilities for each agent
-   - Use descriptive names and roles
-   - Document agent capabilities and limitations
-
-2. **Efficient Communication**:
-   - Use structured message formats
-   - Include relevant context in delegations
-   - Maintain conversation history appropriately
-
-3. **Task Decomposition**:
-   - Break complex tasks into manageable subtasks
-   - Consider dependencies between subtasks
-   - Plan for result aggregation
-
-4. **Error Handling**:
-   - Implement robust error handling at each level
-   - Provide fallback mechanisms
-   - Log errors and recovery attempts
-
-5. **Performance Optimization**:
-   - Consider parallel processing where possible
-   - Cache results when appropriate
-   - Monitor and optimize agent interactions
-
-Hierarchical agent tool usage enables complex task processing by leveraging multiple specialized agents, each with their own tools and capabilities. This approach is particularly useful for tasks that require different types of expertise or multiple processing steps.
+- Research and analysis tasks that require different expertise
+- Complex workflows with multiple steps and dependencies
+- Tasks that benefit from specialized knowledge or capabilities
+- Scenarios where parallel processing of sub-tasks improves efficiency
 
 ## Real Executable Examples
 
@@ -859,7 +1046,7 @@ This section provides real, executable examples using actual APIs and services. 
 This example uses DuckDuckGo for web search and OpenWeatherMap for weather data:
 
 ```python
-import ollama
+from ollama import Client
 import requests
 from typing import Dict, Any
 import json
@@ -890,7 +1077,7 @@ def get_weather(city: str) -> str:
 
 def search_web(query: str) -> str:
     """Search the web using DuckDuckGo API"""
-    url = "https://api.duckduckgo.com/"
+    url = API_ENDPOINTS["duckduckgo"]
     params = {
         "q": query,
         "format": "json"
@@ -911,8 +1098,12 @@ def search_web(query: str) -> str:
 
 def analyze_text(text: str) -> str:
     """Analyze text using Ollama"""
-    response = ollama.chat(
-        host=OLLAMA_CONFIG["base_url"],
+    # Initialize the client with base URL
+    client = Client(
+        host=OLLAMA_CONFIG["base_url"]
+    )
+    
+    response = client.chat(
         model=OLLAMA_CONFIG["default_model"],
         messages=[{
             'role': 'user',
@@ -927,54 +1118,15 @@ def execute_research_task(query: str):
     tools = [
         {
             'type': 'function',
-            'function': {
-                'name': 'search_web',
-                'description': 'Search the web for information',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'query': {
-                            'type': 'string',
-                            'description': 'The search query',
-                        }
-                    },
-                    'required': ['query'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["search_web"]
         },
         {
             'type': 'function',
-            'function': {
-                'name': 'get_weather',
-                'description': 'Get current weather for a city',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'city': {
-                            'type': 'string',
-                            'description': 'The name of the city',
-                        }
-                    },
-                    'required': ['city'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["get_current_weather"]
         },
         {
             'type': 'function',
-            'function': {
-                'name': 'analyze_text',
-                'description': 'Analyze text and provide insights',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'text': {
-                            'type': 'string',
-                            'description': 'The text to analyze',
-                        }
-                    },
-                    'required': ['text'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["analyze_text"]
         }
     ]
 
@@ -983,8 +1135,13 @@ def execute_research_task(query: str):
         {'role': 'user', 'content': query}
     ]
 
+    # Initialize the client with base URL
+    client = Client(
+        host=OLLAMA_CONFIG["base_url"]
+    )
+    
     # First API call
-    response = ollama.chat(
+    response = client.chat(
         model=OLLAMA_CONFIG["default_model"],
         messages=conversation,
         tools=tools
@@ -1002,7 +1159,7 @@ def execute_research_task(query: str):
                 search_results = search_web(args['query'])
                 conversation.append({'role': 'tool', 'content': search_results})
             
-            elif function_name == 'get_weather':
+            elif function_name == 'get_current_weather':
                 weather_info = get_weather(args['city'])
                 conversation.append({'role': 'tool', 'content': weather_info})
             
@@ -1011,7 +1168,7 @@ def execute_research_task(query: str):
                 conversation.append({'role': 'tool', 'content': analysis})
 
         # Get final response
-        final_response = ollama.chat(
+        final_response = client.chat(
             model=OLLAMA_CONFIG["default_model"],
             messages=conversation
         )
@@ -1019,19 +1176,8 @@ def execute_research_task(query: str):
 
 # Example usage
 if __name__ == "__main__":
-    # Use API keys from config
-    OPENWEATHER_API_KEY = API_KEYS["openweather"]
-    
-    # Example queries
-    queries = [
-        "What's the weather in Tokyo and what are the latest developments in quantum computing?",
-        "Research the impact of climate change on polar bears and analyze the findings",
-        "What's the current state of AI regulation in the EU and how does it affect startups?"
-    ]
-    
-    for query in queries:
-        print(f"\nProcessing query: {query}")
-        execute_research_task(query)
+    query = "What is the weather in Tokyo?"
+    execute_research_task(query)
 ```
 
 ### Example 2: Financial Data Analysis
@@ -1039,13 +1185,17 @@ if __name__ == "__main__":
 This example uses the Alpha Vantage API for financial data and Yahoo Finance for market data:
 
 ```python
-import ollama
+from ollama import Client
 import requests
 import pandas as pd
 from typing import Dict, Any
 import yfinance as yf
 from datetime import datetime, timedelta
 from config import OLLAMA_CONFIG, API_KEYS, TOOL_FUNCTIONS, API_ENDPOINTS, ERROR_MESSAGES
+
+client = Client(
+    host=OLLAMA_CONFIG["base_url"]
+)
 
 def get_stock_data(symbol: str) -> str:
     """Get stock data using Yahoo Finance"""
@@ -1093,8 +1243,12 @@ def get_forex_data(from_symbol: str, to_symbol: str) -> str:
 
 def analyze_financial_data(data: str) -> str:
     """Analyze financial data using Ollama"""
-    response = ollama.chat(
-        host=OLLAMA_CONFIG["base_url"],
+    # Initialize the client with base URL
+    client = Client(
+        host=OLLAMA_CONFIG["base_url"]
+    )
+    
+    response = client.chat(
         model=OLLAMA_CONFIG["default_model"],
         messages=[{
             'role': 'user',
@@ -1109,58 +1263,15 @@ def execute_financial_analysis(query: str):
     tools = [
         {
             'type': 'function',
-            'function': {
-                'name': 'get_stock_data',
-                'description': 'Get stock market data for a symbol',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'symbol': {
-                            'type': 'string',
-                            'description': 'The stock symbol (e.g., AAPL, GOOGL)',
-                        }
-                    },
-                    'required': ['symbol'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["get_stock_data"]
         },
         {
             'type': 'function',
-            'function': {
-                'name': 'get_forex_data',
-                'description': 'Get forex exchange rate data',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'from_symbol': {
-                            'type': 'string',
-                            'description': 'The source currency symbol (e.g., USD, EUR)',
-                        },
-                        'to_symbol': {
-                            'type': 'string',
-                            'description': 'The target currency symbol (e.g., USD, EUR)',
-                        }
-                    },
-                    'required': ['from_symbol', 'to_symbol'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["get_forex_data"]
         },
         {
             'type': 'function',
-            'function': {
-                'name': 'analyze_financial_data',
-                'description': 'Analyze financial data and provide insights',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'data': {
-                            'type': 'string',
-                            'description': 'The financial data to analyze',
-                        }
-                    },
-                    'required': ['data'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["analyze_financial_data"]
         }
     ]
 
@@ -1169,8 +1280,13 @@ def execute_financial_analysis(query: str):
         {'role': 'user', 'content': query}
     ]
 
+    # Initialize the client with base URL
+    client = Client(
+        host=OLLAMA_CONFIG["base_url"]
+    )
+    
     # First API call
-    response = ollama.chat(
+    response = client.chat(
         model=OLLAMA_CONFIG["default_model"],
         messages=conversation,
         tools=tools
@@ -1197,27 +1313,15 @@ def execute_financial_analysis(query: str):
                 conversation.append({'role': 'tool', 'content': analysis})
 
         # Get final response
-        final_response = ollama.chat(
+        final_response = client.chat(
             model=OLLAMA_CONFIG["default_model"],
             messages=conversation
         )
         print(final_response['message']['content'])
 
-# Example usage
 if __name__ == "__main__":
-    # Use API keys from config
-    ALPHA_VANTAGE_API_KEY = API_KEYS["alpha_vantage"]
-    
-    # Example queries
-    queries = [
-        "Analyze the performance of AAPL and GOOGL stocks and compare them",
-        "What's the current EUR/USD exchange rate and how does it affect European exports?",
-        "Research the impact of recent market trends on tech stocks and provide insights"
-    ]
-    
-    for query in queries:
-        print(f"\nProcessing query: {query}")
-        execute_financial_analysis(query)
+    query = "What is the latest price of Tesla?"
+    execute_financial_analysis(query)
 ```
 
 ### Example 3: News and Sentiment Analysis
@@ -1225,7 +1329,7 @@ if __name__ == "__main__":
 This example uses NewsAPI for news data and NLTK for sentiment analysis:
 
 ```python
-import ollama
+from ollama import Client
 import requests
 from typing import Dict, Any
 import nltk
@@ -1233,8 +1337,9 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 from datetime import datetime, timedelta
 from config import OLLAMA_CONFIG, API_KEYS, TOOL_FUNCTIONS, API_ENDPOINTS, ERROR_MESSAGES
 
-# API Keys (replace with your own)
-NEWS_API_KEY = "your_news_api_key"  # Get from https://newsapi.org/
+client = Client(
+    host=OLLAMA_CONFIG["base_url"]
+)
 
 # Download required NLTK data
 nltk.download('vader_lexicon')
@@ -1287,8 +1392,12 @@ Compound: {sentiment['compound']:.2f}
 
 def summarize_text(text: str) -> str:
     """Summarize text using Ollama"""
-    response = ollama.chat(
-        host=OLLAMA_CONFIG["base_url"],
+    # Initialize the client with base URL
+    client = Client(
+        host=OLLAMA_CONFIG["base_url"]
+    )
+    
+    response = client.chat(
         model=OLLAMA_CONFIG["default_model"],
         messages=[{
             'role': 'user',
@@ -1303,54 +1412,15 @@ def execute_news_analysis(query: str):
     tools = [
         {
             'type': 'function',
-            'function': {
-                'name': 'get_news',
-                'description': 'Get recent news articles about a topic',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'query': {
-                            'type': 'string',
-                            'description': 'The search query for news',
-                        }
-                    },
-                    'required': ['query'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["get_news"]
         },
         {
             'type': 'function',
-            'function': {
-                'name': 'analyze_sentiment',
-                'description': 'Analyze the sentiment of text',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'text': {
-                            'type': 'string',
-                            'description': 'The text to analyze',
-                        }
-                    },
-                    'required': ['text'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["analyze_sentiment"]
         },
         {
             'type': 'function',
-            'function': {
-                'name': 'summarize_text',
-                'description': 'Summarize text concisely',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'text': {
-                            'type': 'string',
-                            'description': 'The text to summarize',
-                        }
-                    },
-                    'required': ['text'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["summarize_text"]
         }
     ]
 
@@ -1359,8 +1429,13 @@ def execute_news_analysis(query: str):
         {'role': 'user', 'content': query}
     ]
 
+    # Initialize the client with base URL
+    client = Client(
+        host=OLLAMA_CONFIG["base_url"]
+    )
+    
     # First API call
-    response = ollama.chat(
+    response = client.chat(
         model=OLLAMA_CONFIG["default_model"],
         messages=conversation,
         tools=tools
@@ -1387,27 +1462,15 @@ def execute_news_analysis(query: str):
                 conversation.append({'role': 'tool', 'content': summary})
 
         # Get final response
-        final_response = ollama.chat(
+        final_response = client.chat(
             model=OLLAMA_CONFIG["default_model"],
             messages=conversation
         )
         print(final_response['message']['content'])
 
-# Example usage
 if __name__ == "__main__":
-    # Use API keys from config
-    NEWS_API_KEY = API_KEYS["news_api"]
-    
-    # Example queries
-    queries = [
-        "Analyze the sentiment of recent news about artificial intelligence",
-        "Summarize the latest developments in renewable energy and analyze public sentiment",
-        "Research recent news about climate change and provide a comprehensive analysis"
-    ]
-    
-    for query in queries:
-        print(f"\nProcessing query: {query}")
-        execute_news_analysis(query)
+    query = "What is the latest news on Bitcoin?"
+    execute_news_analysis(query)
 ```
 
 To use these examples:
