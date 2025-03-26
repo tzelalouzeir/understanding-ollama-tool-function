@@ -1,3 +1,54 @@
+# Ollama Tool Functions Implementation Guide
+
+This guide explains how to implement and use tool functions with Ollama's LLM models.
+
+## Prerequisites
+
+1. Ollama installed and running
+2. Python 3.7+
+3. Required Python packages:
+```bash
+pip install ollama requests pandas yfinance nltk
+```
+
+## Configuration
+
+Before using the examples, make sure to:
+
+1. Create a `config.py` file with your settings:
+```python
+from config import OLLAMA_CONFIG, API_KEYS, MODEL_PARAMS, TOOL_FUNCTIONS, API_ENDPOINTS, ERROR_MESSAGES
+```
+
+2. Update the configuration with your actual values:
+   - Set your Ollama server URL in `OLLAMA_CONFIG["base_url"]`
+   - Add your API keys in `API_KEYS`
+   - Adjust model parameters in `MODEL_PARAMS` if needed
+
+## Basic Example
+
+```python
+import ollama
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
+
+# Configure the base URL for your Ollama instance
+ollama.set_host(OLLAMA_CONFIG["base_url"])
+
+response = ollama.chat(
+    model=OLLAMA_CONFIG["default_model"],
+    messages=[{'role': 'user', 'content': 'What is the weather in Toronto?'}],
+    tools=[{
+      'type': 'function',
+      'function': TOOL_FUNCTIONS["get_current_weather"]
+    }],
+)
+
+print(response['message']['tool_calls'])
+```
+
+> [!NOTE]
+> Make sure to update the `config.py` file with your actual Ollama server URL and API keys before running the examples.
+
 # Understanding Ollama's Tool Function Implementation
 
 ## Table of Contents
@@ -241,26 +292,17 @@ The OpenAI compatibility layer is particularly important, allowing seamless inte
 
 ```python
 import ollama
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
+
+# Configure the base URL for your Ollama instance
+ollama.set_host(OLLAMA_CONFIG["base_url"])
 
 response = ollama.chat(
-    model='llama3.1',
+    model=OLLAMA_CONFIG["default_model"],
     messages=[{'role': 'user', 'content': 'What is the weather in Toronto?'}],
     tools=[{
       'type': 'function',
-      'function': {
-        'name': 'get_current_weather',
-        'description': 'Get the current weather for a city',
-        'parameters': {
-          'type': 'object',
-          'properties': {
-            'city': {
-              'type': 'string',
-              'description': 'The name of the city',
-            },
-          },
-          'required': ['city'],
-        },
-      },
+      'function': TOOL_FUNCTIONS["get_current_weather"]
     }],
 )
 
@@ -271,34 +313,26 @@ print(response['message']['tool_calls'])
 
 ```python
 import openai
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
-openai.base_url = "http://localhost:11434/v1"
+# Configure the base URL for your Ollama instance
+openai.base_url = f"{OLLAMA_CONFIG['base_url']}/v1"
 openai.api_key = 'ollama'
 
 response = openai.chat.completions.create(
-    model="llama3.1",
+    model=OLLAMA_CONFIG["default_model"],
     messages=[{"role": "user", "content": "What's the weather in New York?"}],
     tools=[{
       "type": "function",
-      "function": {
-        "name": "get_current_weather",
-        "description": "Get the current weather for a city",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "city": {
-              "type": "string",
-              "description": "The name of the city",
-            },
-          },
-          "required": ["city"],
-        },
-      },
+      "function": TOOL_FUNCTIONS["get_current_weather"]
     }],
 )
 
 print(response.choices[0].message.tool_calls)
 ```
+
+> [!NOTE]
+> Make sure to update the `config.py` file with your actual Ollama server URL and API keys before running the examples.
 
 ## Tool Execution Workflow
 
@@ -347,6 +381,7 @@ The actual execution of tools is the responsibility of the client application. H
 
 ```python
 import ollama
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
 # 1. Define your tool implementation in your application
 def get_weather(city):
@@ -355,24 +390,11 @@ def get_weather(city):
 
 # 2. Define the tool for the LLM
 response = ollama.chat(
-    model='llama3.1',
+    model=OLLAMA_CONFIG["default_model"],
     messages=[{'role': 'user', 'content': 'What is the weather in Toronto?'}],
     tools=[{
       'type': 'function',
-      'function': {
-        'name': 'get_current_weather',
-        'description': 'Get the current weather for a city',
-        'parameters': {
-          'type': 'object',
-          'properties': {
-            'city': {
-              'type': 'string',
-              'description': 'The name of the city',
-            },
-          },
-          'required': ['city'],
-        },
-      },
+      'function': TOOL_FUNCTIONS["get_current_weather"]
     }],
 )
 
@@ -387,7 +409,7 @@ if 'tool_calls' in response['message']:
             
             # 5. Send the result back to the LLM
             final_response = ollama.chat(
-                model='llama3.1',
+                model=OLLAMA_CONFIG["default_model"],
                 messages=[
                     {'role': 'user', 'content': 'What is the weather in Toronto?'},
                     response['message'],
@@ -407,6 +429,7 @@ Some models can return multiple tool calls in a single response. Your applicatio
 
 ```python
 import ollama
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
 # Implementation of your tools
 def get_weather(city):
@@ -422,42 +445,16 @@ def get_population(city):
 
 # Define multiple tools
 response = ollama.chat(
-    model='llama3.1',
+    model=OLLAMA_CONFIG["default_model"],
     messages=[{'role': 'user', 'content': 'What is the weather and population in Toronto?'}],
     tools=[
         {
             'type': 'function',
-            'function': {
-                'name': 'get_current_weather',
-                'description': 'Get the current weather for a city',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'city': {
-                            'type': 'string',
-                            'description': 'The name of the city',
-                        },
-                    },
-                    'required': ['city'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["get_current_weather"]
         },
         {
             'type': 'function',
-            'function': {
-                'name': 'get_population',
-                'description': 'Get the population for a city',
-                'parameters': {
-                    'type': 'object',
-                    'properties': {
-                        'city': {
-                            'type': 'string',
-                            'description': 'The name of the city',
-                        },
-                    },
-                    'required': ['city'],
-                },
-            },
+            'function': TOOL_FUNCTIONS["get_population"]
         }
     ],
 )
@@ -487,7 +484,7 @@ if 'tool_calls' in response['message']:
     
     # Send all tool results back to the model
     final_response = ollama.chat(
-        model='llama3.1',
+        model=OLLAMA_CONFIG["default_model"],
         messages=conversation
     )
     
@@ -500,6 +497,7 @@ In more complex scenarios, the model might need to make a sequence of tool calls
 
 ```python
 import ollama
+from config import OLLAMA_CONFIG, TOOL_FUNCTIONS
 
 # Tool implementations
 def search_database(query):
@@ -521,37 +519,11 @@ def get_product_details(product_id):
 tools = [
     {
         'type': 'function',
-        'function': {
-            'name': 'search_database',
-            'description': 'Search for products in the database',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'query': {
-                        'type': 'string',
-                        'description': 'The search query',
-                    },
-                },
-                'required': ['query'],
-            },
-        },
+        'function': TOOL_FUNCTIONS["search_database"]
     },
     {
         'type': 'function',
-        'function': {
-            'name': 'get_product_details',
-            'description': 'Get details about a specific product',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'product_id': {
-                        'type': 'string',
-                        'description': 'The product identifier',
-                    },
-                },
-                'required': ['product_id'],
-            },
-        },
+        'function': TOOL_FUNCTIONS["get_product_details"]
     }
 ]
 
@@ -562,7 +534,7 @@ conversation = [
 
 # First API call - model likely needs to search first
 response = ollama.chat(
-    model='llama3.1',
+    model=OLLAMA_CONFIG["default_model"],
     messages=conversation,
     tools=tools
 )
@@ -583,7 +555,7 @@ if 'tool_calls' in response['message']:
         
         # Second API call - model likely will ask for product details now
         response2 = ollama.chat(
-            model='llama3.1',
+            model=OLLAMA_CONFIG["default_model"],
             messages=conversation,
             tools=tools
         )
@@ -604,7 +576,7 @@ if 'tool_calls' in response['message']:
                 
                 # Final response with all the information
                 final_response = ollama.chat(
-                    model='llama3.1',
+                    model=OLLAMA_CONFIG["default_model"],
                     messages=conversation,
                     tools=tools
                 )
@@ -892,9 +864,29 @@ import requests
 from typing import Dict, Any
 import json
 from datetime import datetime
+from config import OLLAMA_CONFIG, API_KEYS, TOOL_FUNCTIONS, API_ENDPOINTS, ERROR_MESSAGES
 
-# API Keys (replace with your own)
-OPENWEATHER_API_KEY = "your_openweather_api_key"  # Get from https://openweathermap.org/api
+def get_weather(city: str) -> str:
+    """Get weather data using OpenWeatherMap API"""
+    if not API_KEYS["openweather"]:
+        return ERROR_MESSAGES["missing_api_key"].format(service="OpenWeatherMap")
+        
+    url = API_ENDPOINTS["openweather"]
+    params = {
+        "q": city,
+        "appid": API_KEYS["openweather"],
+        "units": "metric"
+    }
+    response = requests.get(url, params=params)
+    data = response.json()
+    
+    if response.status_code == 200:
+        temp = data["main"]["temp"]
+        humidity = data["main"]["humidity"]
+        description = data["weather"][0]["description"]
+        return f"Current weather in {city}: {description}, Temperature: {temp}°C, Humidity: {humidity}%"
+    else:
+        return f"Error getting weather for {city}: {data.get('message', 'Unknown error')}"
 
 def search_web(query: str) -> str:
     """Search the web using DuckDuckGo API"""
@@ -917,29 +909,11 @@ def search_web(query: str) -> str:
     
     return "\n".join(results) if results else "No results found."
 
-def get_weather(city: str) -> str:
-    """Get weather data using OpenWeatherMap API"""
-    url = "http://api.openweathermap.org/data/2.5/weather"
-    params = {
-        "q": city,
-        "appid": OPENWEATHER_API_KEY,
-        "units": "metric"
-    }
-    response = requests.get(url, params=params)
-    data = response.json()
-    
-    if response.status_code == 200:
-        temp = data["main"]["temp"]
-        humidity = data["main"]["humidity"]
-        description = data["weather"][0]["description"]
-        return f"Current weather in {city}: {description}, Temperature: {temp}°C, Humidity: {humidity}%"
-    else:
-        return f"Error getting weather for {city}: {data.get('message', 'Unknown error')}"
-
 def analyze_text(text: str) -> str:
     """Analyze text using Ollama"""
     response = ollama.chat(
-        model='llama3.1',
+        host=OLLAMA_CONFIG["base_url"],
+        model=OLLAMA_CONFIG["default_model"],
         messages=[{
             'role': 'user',
             'content': f"Analyze this text and provide key insights:\n\n{text}"
@@ -1011,7 +985,7 @@ def execute_research_task(query: str):
 
     # First API call
     response = ollama.chat(
-        model='llama3.1',
+        model=OLLAMA_CONFIG["default_model"],
         messages=conversation,
         tools=tools
     )
@@ -1038,15 +1012,15 @@ def execute_research_task(query: str):
 
         # Get final response
         final_response = ollama.chat(
-            model='llama3.1',
+            model=OLLAMA_CONFIG["default_model"],
             messages=conversation
         )
         print(final_response['message']['content'])
 
 # Example usage
 if __name__ == "__main__":
-    # Replace with your OpenWeatherMap API key
-    OPENWEATHER_API_KEY = "your_openweather_api_key"
+    # Use API keys from config
+    OPENWEATHER_API_KEY = API_KEYS["openweather"]
     
     # Example queries
     queries = [
@@ -1071,9 +1045,7 @@ import pandas as pd
 from typing import Dict, Any
 import yfinance as yf
 from datetime import datetime, timedelta
-
-# API Keys (replace with your own)
-ALPHA_VANTAGE_API_KEY = "your_alpha_vantage_api_key"  # Get from https://www.alphavantage.co/
+from config import OLLAMA_CONFIG, API_KEYS, TOOL_FUNCTIONS, API_ENDPOINTS, ERROR_MESSAGES
 
 def get_stock_data(symbol: str) -> str:
     """Get stock data using Yahoo Finance"""
@@ -1099,12 +1071,15 @@ Volume: {volume:,.0f}
 
 def get_forex_data(from_symbol: str, to_symbol: str) -> str:
     """Get forex data using Alpha Vantage API"""
-    url = "https://www.alphavantage.co/query"
+    if not API_KEYS["alpha_vantage"]:
+        return ERROR_MESSAGES["missing_api_key"].format(service="Alpha Vantage")
+        
+    url = API_ENDPOINTS["alpha_vantage"]
     params = {
         "function": "CURRENCY_EXCHANGE_RATE",
         "from_currency": from_symbol,
         "to_currency": to_symbol,
-        "apikey": ALPHA_VANTAGE_API_KEY
+        "apikey": API_KEYS["alpha_vantage"]
     }
     
     response = requests.get(url, params=params)
@@ -1119,7 +1094,8 @@ def get_forex_data(from_symbol: str, to_symbol: str) -> str:
 def analyze_financial_data(data: str) -> str:
     """Analyze financial data using Ollama"""
     response = ollama.chat(
-        model='llama3.1',
+        host=OLLAMA_CONFIG["base_url"],
+        model=OLLAMA_CONFIG["default_model"],
         messages=[{
             'role': 'user',
             'content': f"Analyze this financial data and provide key insights:\n\n{data}"
@@ -1195,7 +1171,7 @@ def execute_financial_analysis(query: str):
 
     # First API call
     response = ollama.chat(
-        model='llama3.1',
+        model=OLLAMA_CONFIG["default_model"],
         messages=conversation,
         tools=tools
     )
@@ -1222,15 +1198,15 @@ def execute_financial_analysis(query: str):
 
         # Get final response
         final_response = ollama.chat(
-            model='llama3.1',
+            model=OLLAMA_CONFIG["default_model"],
             messages=conversation
         )
         print(final_response['message']['content'])
 
 # Example usage
 if __name__ == "__main__":
-    # Replace with your Alpha Vantage API key
-    ALPHA_VANTAGE_API_KEY = "your_alpha_vantage_api_key"
+    # Use API keys from config
+    ALPHA_VANTAGE_API_KEY = API_KEYS["alpha_vantage"]
     
     # Example queries
     queries = [
@@ -1255,6 +1231,7 @@ from typing import Dict, Any
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 from datetime import datetime, timedelta
+from config import OLLAMA_CONFIG, API_KEYS, TOOL_FUNCTIONS, API_ENDPOINTS, ERROR_MESSAGES
 
 # API Keys (replace with your own)
 NEWS_API_KEY = "your_news_api_key"  # Get from https://newsapi.org/
@@ -1265,10 +1242,13 @@ sia = SentimentIntensityAnalyzer()
 
 def get_news(query: str) -> str:
     """Get news articles using NewsAPI"""
-    url = "https://newsapi.org/v2/everything"
+    if not API_KEYS["news_api"]:
+        return ERROR_MESSAGES["missing_api_key"].format(service="NewsAPI")
+        
+    url = API_ENDPOINTS["news_api"]
     params = {
         "q": query,
-        "apiKey": NEWS_API_KEY,
+        "apiKey": API_KEYS["news_api"],
         "from": (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),
         "sortBy": "relevancy",
         "language": "en"
@@ -1308,7 +1288,8 @@ Compound: {sentiment['compound']:.2f}
 def summarize_text(text: str) -> str:
     """Summarize text using Ollama"""
     response = ollama.chat(
-        model='llama3.1',
+        host=OLLAMA_CONFIG["base_url"],
+        model=OLLAMA_CONFIG["default_model"],
         messages=[{
             'role': 'user',
             'content': f"Summarize this text concisely:\n\n{text}"
@@ -1380,7 +1361,7 @@ def execute_news_analysis(query: str):
 
     # First API call
     response = ollama.chat(
-        model='llama3.1',
+        model=OLLAMA_CONFIG["default_model"],
         messages=conversation,
         tools=tools
     )
@@ -1407,15 +1388,15 @@ def execute_news_analysis(query: str):
 
         # Get final response
         final_response = ollama.chat(
-            model='llama3.1',
+            model=OLLAMA_CONFIG["default_model"],
             messages=conversation
         )
         print(final_response['message']['content'])
 
 # Example usage
 if __name__ == "__main__":
-    # Replace with your NewsAPI key
-    NEWS_API_KEY = "your_news_api_key"
+    # Use API keys from config
+    NEWS_API_KEY = API_KEYS["news_api"]
     
     # Example queries
     queries = [
